@@ -6122,29 +6122,35 @@ void ResourceCopyTarget::FindTextureOverrides(CommandListState *state, bool *res
 	// here, and ini `CheckTextureOverride` triggers [TextureOverride] sections correctly.
 	if (G->track_region_hashes)
 	{
-		UINT region_size;
-		uint32_t hash;
+		UINT region_size = 0;
+
 		switch (type) {
-			case ResourceCopyTargetType::VERTEX_BUFFER:
-			{
-				region_size = GetVertexBufferRegionSize(stride, state->call_info);
-				hash = GetRegionHash(state->mOrigContext1, (ID3D11Buffer*)resource, offset, region_size);
-				find_texture_override_for_hash(hash, matches, state->call_info);
-				break;
-			}
-			case ResourceCopyTargetType::INDEX_BUFFER:
-			{
-				region_size = GetIndexBufferRegionSize(format, state->call_info);
-				hash = GetRegionHash(state->mOrigContext1, (ID3D11Buffer*)resource, offset, region_size);
-				find_texture_override_for_hash(hash, matches, state->call_info);
-				break;
-			}
-			default:
-			{
-				find_texture_overrides_for_resource(resource, matches, state->call_info);
-				break;
-			}
+		case ResourceCopyTargetType::VERTEX_BUFFER:
+			region_size = GetVertexBufferRegionSize(stride, state->call_info);
+			break;
+
+		case ResourceCopyTargetType::INDEX_BUFFER:
+			region_size = GetIndexBufferRegionSize(format, state->call_info);
+			break;
 		}
+
+		uint32_t hash = 0;
+
+		if (region_size) {
+			Profiling::State profiling_state;
+			if (Profiling::mode == Profiling::Mode::SUMMARY)
+				Profiling::start(&profiling_state);
+
+			hash = GetRegionHash(state->mOrigContext1, (ID3D11Buffer*)resource, offset, region_size);
+
+			if (Profiling::mode == Profiling::Mode::SUMMARY)
+				Profiling::end(&profiling_state, &Profiling::region_tracking_overhead);
+		}
+
+		if (hash)
+			find_texture_override_for_hash(hash, matches, state->call_info);
+		else
+			find_texture_overrides_for_resource(resource, matches, state->call_info);
 	}
 	else
 	{
